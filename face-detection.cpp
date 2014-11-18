@@ -18,7 +18,7 @@
 # Description: 
 #
 #
-# Last modified: 2014-11-17 14:51
+# Last modified: 2014-11-18 15:10
 #
 # Should you need to contact me, you can do so by 
 # email - mail your message to <xufooo@gmail.com>.
@@ -40,6 +40,7 @@ using namespace std;
 using namespace cv;
 /** Function Headers */
 void detectAndDisplay( Mat frame );
+void cropFace(Mat image, Point eye_left, Point eye_right, double offset_h, double offset_v, int dest_sz_w, int dest_sz_h);
 /** Global variables */
 String haar_dir = "./haarcascades/";
 String lbp_dir = "./lbpcascades/";
@@ -63,11 +64,12 @@ if( !eyes_cascade.load( haar_dir + eyes_cascade_name ) ){ printf("--(!)Error loa
 //if ( ! capture.isOpened() ) { printf("--(!)Error opening video capture\n"); return -1; }
 //while ( capture.read(frame) )
 //{
+string dir_path = "./samples/";
 Directory dir;
-vector<string> filenames = dir.GetListFiles(".", "jpg", true);
+vector<string> filenames = dir.GetListFiles(dir_path , "jpg", true);
 for(int i = 0; i<filenames.size(); i++)
 {
-	Mat image=imread(filenames[i]);
+	Mat image=imread(dir_path + filenames[i]);
 //	Mat image=imread("lena.jpg");
 	frame=&image;
 	if( frame->empty() )
@@ -93,28 +95,55 @@ Mat frame_gray;
 cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
 equalizeHist( frame_gray, frame_gray );
 //-- Detect faces
-face_cascade.detectMultiScale( frame_gray, faces, 1.1, 2, 0, Size(30, 30) );
-
+face_cascade.detectMultiScale( frame_gray, faces, 1.1, 2, 0, Size(80, 80) );
+Point eye_xy[2];
 for( size_t i = 0; i < faces.size(); i++ )
 {
 Mat faceROI = frame_gray( faces[i] );
-//std::vector<Rect> eyes;
+std::vector<Rect> eyes;
 //-- In each face, detect eyes
-//eyes_cascade.detectMultiScale( faceROI, eyes, 1.1, 2, 0 |CASCADE_SCALE_IMAGE, Size(30, 30) );
-//if( eyes.size() == 2)
-//{
+eyes_cascade.detectMultiScale( faceROI, eyes, 1.1, 2, 0 |CASCADE_SCALE_IMAGE, Size(30, 30) );
+if( eyes.size() == 2)
+{
 //-- Draw the face
 Point center( faces[i].x + faces[i].width/2, faces[i].y + faces[i].height/2 );
 ellipse( frame, center, Size( faces[i].width/2, faces[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 0 ), 2, 8, 0 );
-//for( size_t j = 0; j < eyes.size(); j++ )
-//{ //-- Draw the eyes
-//Point eye_center( faces[i].x + eyes[j].x + eyes[j].width/2, faces[i].y + eyes[j].y + eyes[j].height/2 );
-//int radius = cvRound( (eyes[j].width + eyes[j].height)*0.25 );
-//circle( frame, eye_center, radius, Scalar( 255, 0, 255 ), 3, 8, 0 );
-//}
-//}
+for( size_t j = 0; j < eyes.size(); j++ )
+{ //-- Draw the eyes
+Point eye_center( faces[i].x + eyes[j].x + eyes[j].width/2, faces[i].y + eyes[j].y + eyes[j].height/2 );
+int radius = cvRound( (eyes[j].width + eyes[j].height)*0.25 );
+circle( frame, eye_center, radius, Scalar( 255, 0, 255 ), 3, 8, 0 );
+eye_xy[j]=eye_center;
+}
+cropFace(frame, eye_xy[0], eye_xy[1], 0.3, 0.3, 200, 200); 
+}
 }
 //-- Show what you got
-namedWindow( window_name, 1);
 imshow( window_name, frame );
+}
+
+void cropFace(Mat image, Point eye_left, Point eye_right, double offset_pct_h, double offset_pct_v, int dest_sz_w, int dest_sz_h)
+{
+	Size dest_sz(dest_sz_w,dest_sz_h);
+	int offset_h = cvFloor(offset_pct_h * dest_sz.width);	
+	int offset_v = cvFloor(offset_pct_v * dest_sz.height);	
+	double eye_direction_x = eye_right.x - eye_left.x;
+	double eye_direction_y = eye_right.y - eye_left.y;
+	double rotation = -atan2(eye_direction_y, eye_direction_x);
+	double dist = sqrt(eye_direction_x * eye_direction_x + eye_direction_y * eye_direction_y);
+	double reference = dest_sz.width - 2.0 * offset_h;
+	double scale = dist / reference;
+	Mat rot_mat = getRotationMatrix2D(eye_left, rotation, scale);
+	Mat image_r;
+	warpAffine(image, image_r, rot_mat, image.size());
+	imshow(window_name, image_r);
+	waitKey();
+	Rect crop_rect(eye_left.x - scale * offset_h, eye_left.y - scale * offset_v, dest_sz.width * scale, dest_sz.height * scale);
+	Mat cropped_image = image_r(crop_rect).clone();
+	Mat resized_image;
+	resize(cropped_image, resized_image, dest_sz);
+	imshow(window_name, resized_image);
+	waitKey();
+	imshow(window_name, cropped_image);
+	waitKey();
 }
