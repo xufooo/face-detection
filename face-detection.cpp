@@ -18,7 +18,7 @@
 # Description: 
 #
 #
-# Last modified: 2014-11-18 15:10
+# Last modified: 2014-11-19 11:12
 #
 # Should you need to contact me, you can do so by 
 # email - mail your message to <xufooo@gmail.com>.
@@ -35,6 +35,8 @@ ooo modiyied to adjust image detection
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/contrib/contrib.hpp"
 #include <iostream>
+#include <fstream>
+#include <string>
 #include <stdio.h>
 using namespace std;
 using namespace cv;
@@ -46,9 +48,14 @@ String haar_dir = "./haarcascades/";
 String lbp_dir = "./lbpcascades/";
 String face_cascade_name = "haarcascade_frontalface_alt.xml";
 String eyes_cascade_name = "haarcascade_eye_tree_eyeglasses.xml";
+String input_path = "./samples/";
+String output_path = "./outputs/";
 CascadeClassifier face_cascade;
 CascadeClassifier eyes_cascade;
 String window_name = "Image - Face detection";
+unsigned int count_number=0;
+unsigned int group_number=0;
+ofstream cvs_fs;
 /**
 * @function main
 */
@@ -64,13 +71,12 @@ if( !eyes_cascade.load( haar_dir + eyes_cascade_name ) ){ printf("--(!)Error loa
 //if ( ! capture.isOpened() ) { printf("--(!)Error opening video capture\n"); return -1; }
 //while ( capture.read(frame) )
 //{
-string input_path = "./samples/";
+cvs_fs.open((output_path + "r.cvs").c_str(), ofstream::out|ofstream::trunc);
 Directory dir;
 vector<string> filenames = dir.GetListFiles(input_path , "jpg", true);
 for(int i = 0; i<filenames.size(); i++)
 {
 	Mat image=imread(input_path + filenames[i]);
-//	Mat image=imread("lena.jpg");
 	frame=&image;
 	if( frame->empty() )
 	{
@@ -83,6 +89,7 @@ detectAndDisplay( *frame );
 int c = waitKey();
 if( (char)c == 27 ) { break; }
 }
+cvs_fs.close();
 return 0;
 }
 /**
@@ -96,7 +103,6 @@ cvtColor( frame, frame_gray, COLOR_BGR2GRAY );
 equalizeHist( frame_gray, frame_gray );
 //-- Detect faces
 face_cascade.detectMultiScale( frame_gray, faces, 1.1, 2, 0, Size(80, 80) );
-Point eye_xy[2];
 for( size_t i = 0; i < faces.size(); i++ )
 {
 Mat faceROI = frame_gray( faces[i] );
@@ -106,6 +112,8 @@ eyes_cascade.detectMultiScale( faceROI, eyes, 1.1, 2, 0 |CASCADE_SCALE_IMAGE, Si
 if( eyes.size() == 2)
 {
 //-- Draw the face
+Point eye_xy[2];
+Mat frame_to_crop = frame.clone();
 Point center( faces[i].x + faces[i].width/2, faces[i].y + faces[i].height/2 );
 ellipse( frame, center, Size( faces[i].width/2, faces[i].height/2 ), 0, 0, 360, Scalar( 255, 0, 0 ), 2, 8, 0 );
 for( size_t j = 0; j < eyes.size(); j++ )
@@ -115,7 +123,12 @@ int radius = cvRound( (eyes[j].width + eyes[j].height)*0.25 );
 circle( frame, eye_center, radius, Scalar( 255, 0, 255 ), 3, 8, 0 );
 eye_xy[j]=eye_center;
 }
-imwrite("./outputs/Test.jpg", cropFace(frame, eye_xy[0], eye_xy[1], 0.3, 0.3, 200, 200)); 
+string output_name;
+stringstream ss;
+ss<<output_path<<"test"<<count_number++<<".jpg";
+ss>>output_name;
+imwrite(output_name, cropFace(frame_to_crop, eye_xy[0], eye_xy[1], 0.3, 0.3, 200, 200)); 
+cvs_fs<<output_name<<";"<<group_number<<"\n";
 }
 }
 //-- Show what you got
@@ -130,35 +143,22 @@ Mat cropFace(Mat image, Point eye_1, Point eye_2, double offset_pct_h, double of
 	else
 		eye_left = eye_2, eye_right = eye_1;
 
-	cout<<"eye_left: "<<eye_left<<"\n"<<"eye_right: "<<eye_right<<"\n";
 	Size dest_sz(dest_sz_w,dest_sz_h);
 	int offset_h = cvFloor(offset_pct_h * dest_sz.width);	
 	int offset_v = cvFloor(offset_pct_v * dest_sz.height);	
-	cout<<"offset_h: "<<offset_h<<"\n"<<"offset_v: "<<offset_v<<"\n";
 	double eye_direction_x = eye_right.x - eye_left.x;
 	double eye_direction_y = eye_right.y - eye_left.y;
-	cout<<"eye_direction_x: "<<eye_direction_x<<"\n"<<"eye_direction_y: "<<eye_direction_y<<"\n";
 	double rotation = atan2(eye_direction_y, eye_direction_x);
-	cout<<"rotation: "<<rotation<<"\n";
 	double dist = sqrt(eye_direction_x * eye_direction_x + eye_direction_y * eye_direction_y);
-	cout<<"dist: "<<dist<<"\n";
 	double reference = dest_sz.width - 2.0 * offset_h;
-	cout<<"reference: "<<reference<<"\n";
 	double scale = dist / reference;
-	cout<<"scale: "<<scale<<"\n";
-	Mat rot_mat = getRotationMatrix2D(eye_left, rotation*180/3.14, 1);
+	Mat rot_mat = getRotationMatrix2D(eye_left, rotation*180/M_PI, 1);
 	Mat image_r;
 	warpAffine(image, image_r, rot_mat, image_r.size());
-	imshow(window_name, image_r);
-	waitKey();
 	Rect crop_rect(eye_left.x - scale * offset_h, eye_left.y - scale * offset_v, dest_sz.width * scale, dest_sz.height * scale);
-	cout<<"crop_rect: "<<crop_rect<<"\n";
 	Mat cropped_image = image_r(crop_rect).clone();
 	Mat resized_image;
 	resize(cropped_image, resized_image, dest_sz);
-	imshow(window_name, resized_image);
-	waitKey();
-	imshow(window_name, cropped_image);
-	waitKey();
-	return cropped_image;
+
+	return resized_image;
 }
