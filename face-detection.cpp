@@ -73,10 +73,16 @@ if( !eyes_cascade.load( haar_dir + eyes_cascade_name ) ){ printf("--(!)Error loa
 //{
 cvs_fs.open((output_path + "r.cvs").c_str(), ofstream::out|ofstream::trunc);
 Directory dir;
-vector<string> filenames = dir.GetListFiles(input_path , "jpg", true);
+while(1){
+string input_name;
+stringstream ss;
+ss<<input_path<<"S"<<++group_number<<"/";
+ss>>input_name;
+vector<string> filenames = dir.GetListFiles(input_name , "jpg", true);
+if(filenames.empty()) break;
 for(int i = 0; i<filenames.size(); i++)
 {
-	Mat image=imread(input_path + filenames[i]);
+	Mat image=imread(input_name + filenames[i]);
 	frame=&image;
 	if( frame->empty() )
 	{
@@ -88,6 +94,7 @@ detectAndDisplay( *frame );
 //-- bail out if escape was pressed
 int c = waitKey();
 if( (char)c == 27 ) { break; }
+}
 }
 cvs_fs.close();
 return 0;
@@ -125,7 +132,7 @@ eye_xy[j]=eye_center;
 }
 string output_name;
 stringstream ss;
-ss<<output_path<<"test"<<count_number++<<".jpg";
+ss<<output_path<<"S"<<group_number<<"_"<<count_number++<<".jpg";
 ss>>output_name;
 imwrite(output_name, cropFace(frame_to_crop, eye_xy[0], eye_xy[1], 0.3, 0.3, 200, 200)); 
 cvs_fs<<output_name<<";"<<group_number<<"\n";
