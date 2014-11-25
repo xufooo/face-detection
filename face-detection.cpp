@@ -83,17 +83,17 @@ if(filenames.empty()) break;
 for(int i = 0; i<filenames.size(); i++)
 {
 	Mat image=imread(input_name + filenames[i]);
-	frame=&image;
-	if( frame->empty() )
+//	frame=&image;
+	if( image.empty() )
 	{
 		printf(" --(!) No captured frame -- Break!");
 		break;
 	}
 //-- 3. Apply the classifier to the frame
-detectAndDisplay( *frame );
+detectAndDisplay( image );
 //-- bail out if escape was pressed
-int c = waitKey();
-if( (char)c == 27 ) { break; }
+//int c = waitKey();
+//if( (char)c == 27 ) { break; }
 }
 }
 cvs_fs.close();
@@ -139,7 +139,7 @@ cvs_fs<<output_name<<";"<<group_number<<"\n";
 }
 }
 //-- Show what you got
-imshow( window_name, frame );
+//imshow( window_name, frame );
 }
 
 Mat cropFace(Mat image, Point eye_1, Point eye_2, double offset_pct_h, double offset_pct_v, int dest_sz_w, int dest_sz_h)
